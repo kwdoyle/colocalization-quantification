@@ -371,7 +371,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
      pltlst <- list(plt1)
     
   } else if ((length(unique(df$slice)) == 2 & 'section' %in% names(df)) | makemainfig) {
-        if (!("M" %in% df$Sex & "F" %in% df$Sex)) {
+        if (!("M" %in% df$Sex & "F" %in% df$Sex) | plot_GT_separate) {
       df <- df[df$Sex != "Combined", ]
     }
     colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
@@ -427,28 +427,47 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     # for if plot_GT_separate (don't need?)
     # df$GT_Sex <- interaction(df$GT, df$Sex, drop = TRUE, sep = " ")
     
-   plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=slice_id)) +
-        # geom_boxplot(outlier.shape=NA) +
-        geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize)
-   
-   if (plot_GT_separate) {
-     plt1 <- plt1 +
-         # facet_wrap(GT ~ Sex, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
-         facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
-   } else {
-     plt1 <- plt1 +
+    if (plot_GT_separate) {
+     plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex, group=slice_id)) +
+          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
+         facet_wrap(~ GT, ncol=1, labeller = as_labeller(c(WT="WT", Hz="Hz")), scales="free_x")
+     # change colors
+     colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
+    } else {
+     plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=slice_id)) +
+          # geom_boxplot(outlier.shape=NA) +
+          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
          facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
-   }
+    }
+    
+   
+   # if (plot_GT_separate) {
+   #   plt1 <- plt1 +
+   #       # facet_wrap(GT ~ Sex, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+   #       facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+   # } else {
+   #   plt1 <- plt1 +
+   #       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
+   # }
      
    plt1 <- plt1 +
        scale_color_manual(values = colors2) +
         # scale_fill_manual(values = colors2) +
      
-         scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+         scale_x_discrete(limits = levels(df[,x_var, drop=T]))
+   
+   if (plot_GT_separate) {
+     plt1 <- plt1 +
+     stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
+     stat_summary(fun = 'median', geom = 'line', aes(group = Sex, color = Sex), size = 1.5)
+   } else {
+     plt1 <- plt1 +
      # Have multiple horizontal lines, I guess, because of how many boxplots there'd normally be
      stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-     stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5) +
+     stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5)
      
+   }
+     plt1 <- plt1 +
         # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
         labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
         theme_bw() +
@@ -462,10 +481,11 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
                plot.title=element_text(size=17),
                strip.text=element_text(size=labelsize))
    
-   if (plot_GT_separate) {
-     plt1 <- plt1 +
-       theme(strip.text.y = element_text(angle = 0)) 
-   }
+   # if (plot_GT_separate) {
+   #   # does nothing
+   #   plt1 <- plt1 +
+   #     theme(strip.text.y = element_text(angle = 0)) 
+   # }
          # geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
          #                        position=position_dodge(width=0.75),
          #                        show.legend=F,
@@ -494,12 +514,26 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       filter(Sex == "Combined")
         
     if (plotallagg) {
+      if (plot_GT_separate) {
+        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex))
+        colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
+      } else {
+        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT))
+        colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
+        
+      }
       # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT))
-      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT))
       plttitle <- "slices and mice combined"
+      
     } else {
+      if (plot_GT_separate) {
+        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex, group=GT_id))
+        colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
+      } else {
+        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=GT_id))
+        colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
+      }
       # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=GT_id))
-      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=GT_id))
       plttitle <- "slices combined"
       
     }
@@ -542,7 +576,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
         
         if (plot_GT_separate) {
           plt2 <- plt2 +
-           facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+           facet_wrap(~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
         } else {
           plt2 <- plt2 +
            facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
@@ -551,9 +585,20 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
         plt2 <- plt2 +
       # scale_fill_manual(values = colors2) +
      scale_color_manual(values = colors2) +
-     scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-          stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-          stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5) +
+     scale_x_discrete(limits = levels(df[,x_var, drop=T])) 
+        
+        if (plot_GT_separate) {
+          plt2 <- plt2 +
+            stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
+            stat_summary(fun = 'median', geom = 'line', aes(group = Sex, color = Sex), size = 1.5)
+          
+        } else {
+          plt2 <- plt2 +
+            stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
+            stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5)
+          
+        }
+        plt2 <- plt2 +
       # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
       labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
       theme_bw() +
@@ -583,6 +628,8 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     
     
     
+    # Just set colors2 back to 'normal'.
+    colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
     
     plt3 <- ggplot(filter(df, Sex != "Combined"), aes(x=.data[[x_var]], y = .data[[y_var]], color = GT)) +
       geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
