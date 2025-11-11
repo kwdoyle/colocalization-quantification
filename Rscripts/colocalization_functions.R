@@ -152,7 +152,8 @@ dayGTcompare <- function(day, d, yvar, xvar="Day") {
 
 
 plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_outliers=TRUE, show_p_correct=TRUE, plotfull=FALSE, 
-                             plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
+                             plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE,
+                             plot_GT_separate=FALSE) {
   if (show_p_correct) {
     pcoluse <- "p_adj"
   } else {
@@ -370,7 +371,9 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
      pltlst <- list(plt1)
     
   } else if ((length(unique(df$slice)) == 2 & 'section' %in% names(df)) | makemainfig) {
-    
+        if (!("M" %in% df$Sex & "F" %in% df$Sex)) {
+      df <- df[df$Sex != "Combined", ]
+    }
     colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
     # make new variable for the 'slices combined' plot
     df$GT_id <- paste(df$GT, df$id, sep=".")
@@ -395,12 +398,58 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       ungroup() %>% 
       dplyr::select(-sex_orig)
     
-   plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id)) +
-        geom_boxplot(outlier.shape=NA) +
-         facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
-        scale_fill_manual(values = colors2) +
+   # plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id)) +
+   #      geom_boxplot(outlier.shape=NA) +
+   #       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
+   #      scale_fill_manual(values = colors2) +
+   #       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+   #      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
+   #      labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
+   #      theme_bw() +
+   #       theme(axis.text=element_text(size=labelsize),
+   #             axis.text.x=element_text(size=labelsize),
+   #             axis.text.y=element_text(size=labelsize),
+   #             axis.title=element_text(size=labelsize),
+   #             legend.key.size=unit(1.5, 'cm'),
+   #             legend.title=element_text(size=14),
+   #             legend.text=element_text(size=12),
+   #             plot.title=element_text(size=17),
+   #             strip.text=element_text(size=labelsize)) +
+   #       geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
+   #                              position=position_dodge(width=0.75),
+   #                              show.legend=F,
+   #                 size=5, angle=90, fontface="bold")
+   
+    
+   # Change plt1 and plt2 to use the same visualization as plt3
+   # NOTE: I can't plot each mice separately using this viz? ...wait, I think that's the point.
+    
+    # for if plot_GT_separate (don't need?)
+    # df$GT_Sex <- interaction(df$GT, df$Sex, drop = TRUE, sep = " ")
+    
+   plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=slice_id)) +
+        # geom_boxplot(outlier.shape=NA) +
+        geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize)
+   
+   if (plot_GT_separate) {
+     plt1 <- plt1 +
+         # facet_wrap(GT ~ Sex, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+         facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+   } else {
+     plt1 <- plt1 +
+         facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
+   }
+     
+   plt1 <- plt1 +
+       scale_color_manual(values = colors2) +
+        # scale_fill_manual(values = colors2) +
+     
          scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-        geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
+     # Have multiple horizontal lines, I guess, because of how many boxplots there'd normally be
+     stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
+     stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5) +
+     
+        # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
         labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
         theme_bw() +
          theme(axis.text=element_text(size=labelsize),
@@ -411,11 +460,16 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
                legend.title=element_text(size=14),
                legend.text=element_text(size=12),
                plot.title=element_text(size=17),
-               strip.text=element_text(size=labelsize)) +
-         geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
-                                position=position_dodge(width=0.75),
-                                show.legend=F,
-                   size=5, angle=90, fontface="bold")
+               strip.text=element_text(size=labelsize))
+   
+   if (plot_GT_separate) {
+     plt1 <- plt1 +
+       theme(strip.text.y = element_text(angle = 0)) 
+   }
+         # geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
+         #                        position=position_dodge(width=0.75),
+         #                        show.legend=F,
+         #           size=5, angle=90, fontface="bold")
     
     
     # label data
@@ -440,21 +494,67 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       filter(Sex == "Combined")
         
     if (plotallagg) {
-      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT))
+      # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT))
+      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT))
       plttitle <- "slices and mice combined"
     } else {
-      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=GT_id))
+      # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=GT_id))
+      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=GT_id))
       plttitle <- "slices combined"
       
     }
     
-    plt2 <- plt2 +
-      geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
-       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
-      scale_fill_manual(values = colors2) +
+    # plt2 <- plt2 +
+    #   geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
+    #    facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
+    #   scale_fill_manual(values = colors2) +
+    #  scale_color_manual(values = colors2) +
+    #  scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+    #   geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) +
+    #   labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
+    #   theme_bw() +
+    #    theme(axis.text=element_text(size=labelsize),
+    #          axis.text.x=element_text(size=labelsize),
+    #          axis.text.y=element_text(size=labelsize),
+    #          axis.title=element_text(size=labelsize),
+    #          legend.key.size=unit(1.5, 'cm'),
+    #          legend.title=element_text(size=14),
+    #          legend.text=element_text(size=12),
+    #          plot.title=element_text(size=17),
+    #          strip.text=element_text(size=labelsize)) +
+    #    geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
+    #                           position=position_dodge(width=0.75),
+    #                           show.legend=F,
+    #              size=5, angle=90, fontface="bold") +
+    #  geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
+    #            size=5)
+    # 
+    # # add comparisons separately -- ignore the 'combined' group
+    # plt2 <- plt2 +
+    #     stat_compare_means(label = "p.format", method = "wilcox.test", size = pvalsize,
+    #                  data = subset(df, Sex != "Combined"))
+    
+    
+   # Change plt1 and plt2 to use the same visualization as plt3
+        plt2 <- plt2 +
+      # geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
+          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) 
+        
+        if (plot_GT_separate) {
+          plt2 <- plt2 +
+           facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
+        } else {
+          plt2 <- plt2 +
+           facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
+        }
+        
+        plt2 <- plt2 +
+      # scale_fill_manual(values = colors2) +
      scale_color_manual(values = colors2) +
      scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
+          stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
+          stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5) +
+      # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
       labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
       theme_bw() +
        theme(axis.text=element_text(size=labelsize),
@@ -465,18 +565,23 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
              legend.title=element_text(size=14),
              legend.text=element_text(size=12),
              plot.title=element_text(size=17),
-             strip.text=element_text(size=labelsize)) +
-       geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
-                              position=position_dodge(width=0.75),
-                              show.legend=F,
-                 size=5, angle=90, fontface="bold") +
+             strip.text=element_text(size=labelsize)) 
+       # geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
+       #                        position=position_dodge(width=0.75),
+       #                        show.legend=F,
+       #           size=5, angle=90, fontface="bold") +
+      if (!plot_GT_separate) {
+        plt2 <- plt2 +
      geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
-               size=5)
-     
-    # add comparisons separately -- ignore the 'combined' group
+               size=5, color='black')
     plt2 <- plt2 +
         stat_compare_means(label = "p.format", method = "wilcox.test", size = pvalsize,
                      data = subset(df, Sex != "Combined"))
+      }
+     
+    # add comparisons separately -- ignore the 'combined' group
+    
+    
     
     
     plt3 <- ggplot(filter(df, Sex != "Combined"), aes(x=.data[[x_var]], y = .data[[y_var]], color = GT)) +
@@ -694,7 +799,7 @@ processSection <- function(sumout, slice, type, minfo, sex_analyze) {
 
 
 processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p_correct=TRUE, plotallagg, ptsize=0.9, pvalsize=5, labelsize=12, rm_outliers=TRUE,
-                      make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
+                      make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE, plot_GT_separate=FALSE) {
   if (is.null(df)) {
     return(NULL)
   }
@@ -706,6 +811,7 @@ processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p
   df_copy <- df
   df_copy$Sex <- "Combined"
   df_new <- rbind(df, df_copy)
+
   
   # account for new sex_orig param
   plot_vars <- names(df_new)[start_idx:(ncol(df_new) - 1)]
@@ -717,7 +823,8 @@ processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p
   plot_vars <- names(chkvars[which(!chkvars)])
   plot_lst <- plot_vars %>% 
     map(~ plotInLoop_multi(df_new, .x, x_var=x_var, col_var=col_var, calcKey = calc_key, show_p_correct=show_p_correct, rm_outliers=rm_outliers, plotfull = FALSE, ptsize=ptsize,
-                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig)) %>% 
+                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig,
+                           plot_GT_separate=plot_GT_separate)) %>% 
     try(., silent = TRUE)
   
   return(list(df=df_new, plot_lst=plot_lst, plot_vars=plot_vars))
