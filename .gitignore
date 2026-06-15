@@ -7,3 +7,6 @@ out/
 *.pyc
 .Rhistory
 .vscode/
+old*
+test*
+wrapper*
