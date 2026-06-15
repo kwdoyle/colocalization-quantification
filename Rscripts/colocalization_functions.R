@@ -15,11 +15,11 @@ runCountSum <- function(x, formnms, funcrun="split", dapithresh=1000) {
 
 
 coreSummaryFunc <- function(df2, formnms, id) {
-  keynmidx_fulltbl <- which(names(df2) %in% c("section", "id", "type"))
+  keynmidx_fulltbl <- which(names(df2) %in% c("section", "id", "type", "dapi_colocalize"))
   
   # need to remove keynmidx after having removed the "express" names
   names_not_express <- names(df2)[-grep("express", names(df2))]
-  keynmidx <- which(names_not_express %in% c("section", "id", "type"))
+  keynmidx <- which(names_not_express %in% c("section", "id", "type", "dapi_colocalize"))
   regnms <- names_not_express[-keynmidx]
   usenms <- c(regnms, formnms)
   
@@ -28,7 +28,7 @@ coreSummaryFunc <- function(df2, formnms, id) {
   if (ncol(dfuse) != length(usenms)) {
     stop("unequal number of columns to plot vs column names to use")
   }
-
+  
   par(mfrow = c(3, ceiling(ncol(dfuse) / 4)))
   lapply(1:ncol(dfuse), function(x) {
     if (!all(is.na(dfuse[,x,drop=T]))) {
@@ -152,8 +152,7 @@ dayGTcompare <- function(day, d, yvar, xvar="Day") {
 
 
 plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_outliers=TRUE, show_p_correct=TRUE, plotfull=FALSE, 
-                             plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE,
-                             plot_GT_separate=FALSE) {
+                             plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
   if (show_p_correct) {
     pcoluse <- "p_adj"
   } else {
@@ -172,14 +171,14 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
   
   df <- df %>%
     filter(!is.na(.data[[y_var]])) %>% 
-  group_by(as.factor(Day))
+    group_by(as.factor(Day))
   
   if (!plotfull & rm_outliers) {
     df <- df %>% 
-    mutate(is_outlier = !between(.data[[y_var]], 
-                                 quantile(.data[[y_var]], 0.25) - 1.5 * IQR(.data[[y_var]]), 
-                                 quantile(.data[[y_var]], 0.75) + 1.5 * IQR(.data[[y_var]]))) %>%
-    filter(!is_outlier) %>%
+      mutate(is_outlier = !between(.data[[y_var]], 
+                                   quantile(.data[[y_var]], 0.25) - 1.5 * IQR(.data[[y_var]]), 
+                                   quantile(.data[[y_var]], 0.75) + 1.5 * IQR(.data[[y_var]]))) %>%
+      filter(!is_outlier) %>%
       distinct()
   }
   
@@ -275,7 +274,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     
     # fill using Virus instead
     plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=Virus, group=slice_id, color=Virus))
-      
+    
     plt1 <- plt1 +
       geom_boxplot(outlier.shape=NA, color="black") +
       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
@@ -311,7 +310,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     ordertbl2 = unique(df[,c("GT", "sex_orig", "id", "GT_id")]) %>%
       arrange(GT, sex_orig, id)
     factor_order2 <- ordertbl2$GT_id
-
+    
     df$GT_id <- factor(df$GT_id, levels=factor_order2)
     # new way to make same plot as above
     df$slice_id <- paste(df$slice, df$id, sep=".")
@@ -326,61 +325,70 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     factor_order3 <- ordertblnew$slice_id
     
     df$slice_id <- factor(df$slice_id, levels=factor_order3)
-
-
+    
+    group_vars <- c("id", x_var, "GT", "slice", "Sex", "sex_orig", "slice_id")
+    if (!is.null(col_var)) {
+      group_vars <- c(group_vars, col_var)
+    }
+    
     idlabdat <- df %>% 
-      group_by(id, Day, GT, slice, Sex, sex_orig, slice_id) %>%
-      group_by(across(c(id, !!sym(x_var), GT, slice, Sex, sex_orig, slice_id))) %>% 
+      # group_by(id, Day, GT, slice, Sex, sex_orig, slice_id) %>%  # don't need this group_by
+      # group_by(across(c(id, !!sym(x_var), GT, slice, Sex, sex_orig, slice_id))) %>% 
+      group_by(across(all_of(group_vars))) %>% 
       summarise(ypos = (min(!!sym(y_var)) * 0.9) - sub_dist) %>%  #0.05)
       ungroup() %>% 
       dplyr::select(-sex_orig)
     
-     # M and F separate via facet_wrap
+    # M and F separate via facet_wrap
     if (!is.null(col_var)) {
-       plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id, color=.data[[col_var]]))
+      # set colors for col_var
+      col_levels <- unique(df[[col_var]])
+      hex_cols_4_col_var <- c("#00A607", "#121A00")
+      color_vec_for_colvar <- color_vec_for_colvar <- setNames(hex_cols_4_col_var, col_levels)
+      
+      plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id, color=.data[[col_var]])) +
+        scale_color_manual(values=color_vec_for_colvar)
       
     } else if (is.null(col_var)) {
-       plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id))
+      plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id))
       
     } else {
       stop("col_var not set correctly")
     }
     plt1 <- plt1 +
       geom_boxplot(outlier.shape=NA) +
-       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
+      facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
       scale_fill_manual(values = colors2) +
-         scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+      scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
       geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) +
       labs(x="Days", y="Percent", title=calcKey[[y_var]]) +
       theme_bw() +
       stat_compare_means(label="p.format", method="t.test", size=pvalsize) +
-       theme(axis.text=element_text(size=labelsize),
-             axis.text.x=element_text(size=labelsize),
-             axis.text.y=element_text(size=labelsize),
-             axis.title=element_text(size=labelsize),
-             legend.key.size=unit(1.5, 'cm'),
-             legend.title=element_text(size=14),
-             legend.text=element_text(size=12),
-             plot.title=element_text(size=labelsize + 5),
-             strip.text=element_text(size=labelsize)) +
-       geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
-                 position=position_dodge(width=0.75),
-                 show.legend=F,
-                 size=5, angle=90, fontface="bold")
+      theme(axis.text=element_text(size=labelsize),
+            axis.text.x=element_text(size=labelsize),
+            axis.text.y=element_text(size=labelsize),
+            axis.title=element_text(size=labelsize),
+            legend.key.size=unit(1.5, 'cm'),
+            legend.title=element_text(size=14),
+            legend.text=element_text(size=12),
+            plot.title=element_text(size=labelsize + 5),
+            strip.text=element_text(size=labelsize)) +
+      geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
+                position=position_dodge(width=0.75),
+                show.legend=F,
+                size=5, angle=90, fontface="bold")
     
-     pltlst <- list(plt1)
+    pltlst <- list(plt1)
     
   } else if ((length(unique(df$slice)) == 2 & 'section' %in% names(df)) | makemainfig) {
-        if (!("M" %in% df$Sex & "F" %in% df$Sex) | plot_GT_separate) {
-      df <- df[df$Sex != "Combined", ]
-    }
+    
     colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
     # make new variable for the 'slices combined' plot
     df$GT_id <- paste(df$GT, df$id, sep=".")
     ordertbl2 = unique(df[,c("GT", "sex_orig", "id", "GT_id")]) %>%
       arrange(GT, sex_orig, id)
     factor_order2 <- ordertbl2$GT_id
-
+    
     df$GT_id <- factor(df$GT_id, levels=factor_order2)
     # new way to make same plot as above
     df$slice_id <- paste(df$slice, df$id, sep=".")
@@ -390,106 +398,35 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     factor_order3 <- ordertblnew$slice_id
     
     df$slice_id <- factor(df$slice_id, levels=factor_order3)
-
-
+    
+    
     idlabdat <- df %>% 
       group_by(across(c(id, !!sym(x_var), GT, slice, Sex, sex_orig, slice_id))) %>% 
       summarise(ypos = (min(!!sym(y_var)) * 0.9) - sub_dist) %>%
       ungroup() %>% 
       dplyr::select(-sex_orig)
     
-   # plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id)) +
-   #      geom_boxplot(outlier.shape=NA) +
-   #       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
-   #      scale_fill_manual(values = colors2) +
-   #       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-   #      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
-   #      labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
-   #      theme_bw() +
-   #       theme(axis.text=element_text(size=labelsize),
-   #             axis.text.x=element_text(size=labelsize),
-   #             axis.text.y=element_text(size=labelsize),
-   #             axis.title=element_text(size=labelsize),
-   #             legend.key.size=unit(1.5, 'cm'),
-   #             legend.title=element_text(size=14),
-   #             legend.text=element_text(size=12),
-   #             plot.title=element_text(size=17),
-   #             strip.text=element_text(size=labelsize)) +
-   #       geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
-   #                              position=position_dodge(width=0.75),
-   #                              show.legend=F,
-   #                 size=5, angle=90, fontface="bold")
-   
-    
-   # Change plt1 and plt2 to use the same visualization as plt3
-   # NOTE: I can't plot each mice separately using this viz? ...wait, I think that's the point.
-    
-    # for if plot_GT_separate (don't need?)
-    # df$GT_Sex <- interaction(df$GT, df$Sex, drop = TRUE, sep = " ")
-    
-    if (plot_GT_separate) {
-     plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex, group=slice_id)) +
-          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
-         facet_wrap(~ GT, ncol=1, labeller = as_labeller(c(WT="WT", Hz="Hz")), scales="free_x")
-     # change colors
-     colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
-    } else {
-     plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=slice_id)) +
-          # geom_boxplot(outlier.shape=NA) +
-          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
-         facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
-    }
-    
-   
-   # if (plot_GT_separate) {
-   #   plt1 <- plt1 +
-   #       # facet_wrap(GT ~ Sex, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
-   #       facet_wrap(Sex ~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
-   # } else {
-   #   plt1 <- plt1 +
-   #       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
-   # }
-     
-   plt1 <- plt1 +
-       scale_color_manual(values = colors2) +
-        # scale_fill_manual(values = colors2) +
-     
-         scale_x_discrete(limits = levels(df[,x_var, drop=T]))
-   
-   if (plot_GT_separate) {
-     plt1 <- plt1 +
-     stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-     stat_summary(fun = 'median', geom = 'line', aes(group = Sex, color = Sex), size = 1.5)
-   } else {
-     plt1 <- plt1 +
-     # Have multiple horizontal lines, I guess, because of how many boxplots there'd normally be
-     stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-     stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5)
-     
-   }
-     plt1 <- plt1 +
-        # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
-        labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
-        theme_bw() +
-         theme(axis.text=element_text(size=labelsize),
-               axis.text.x=element_text(size=labelsize),
-               axis.text.y=element_text(size=labelsize),
-               axis.title=element_text(size=labelsize),
-               legend.key.size=unit(1.5, 'cm'),
-               legend.title=element_text(size=14),
-               legend.text=element_text(size=12),
-               plot.title=element_text(size=17),
-               strip.text=element_text(size=labelsize))
-   
-   # if (plot_GT_separate) {
-   #   # does nothing
-   #   plt1 <- plt1 +
-   #     theme(strip.text.y = element_text(angle = 0)) 
-   # }
-         # geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
-         #                        position=position_dodge(width=0.75),
-         #                        show.legend=F,
-         #           size=5, angle=90, fontface="bold")
+    plt1 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=slice_id)) +
+      geom_boxplot(outlier.shape=NA) +
+      facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
+      scale_fill_manual(values = colors2) +
+      scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
+      labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
+      theme_bw() +
+      theme(axis.text=element_text(size=labelsize),
+            axis.text.x=element_text(size=labelsize),
+            axis.text.y=element_text(size=labelsize),
+            axis.title=element_text(size=labelsize),
+            legend.key.size=unit(1.5, 'cm'),
+            legend.title=element_text(size=14),
+            legend.text=element_text(size=12),
+            plot.title=element_text(size=17),
+            strip.text=element_text(size=labelsize)) +
+      geom_text(data=idlabdat, aes(label=as.character(id), y=ypos),
+                position=position_dodge(width=0.75),
+                show.legend=F,
+                size=5, angle=90, fontface="bold")
     
     
     # label data
@@ -512,124 +449,46 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       dplyr::select(c(!!sym(x_var), GT, GT_id, Sex, p_value, p_adj, ypos)) %>% 
       distinct() %>% 
       filter(Sex == "Combined")
-        
+    
     if (plotallagg) {
-      if (plot_GT_separate) {
-        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex))
-        colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
-      } else {
-        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT))
-        colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
-        
-      }
-      # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT))
+      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT))
       plttitle <- "slices and mice combined"
-      
     } else {
-      if (plot_GT_separate) {
-        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=Sex, group=GT_id))
-        colors2 <- c("M" = "#2754F5", "F" = "#F527C2")
-      } else {
-        plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], color=GT, group=GT_id))
-        colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
-      }
-      # plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=GT_id))
+      plt2 <- ggplot(df, aes(x=.data[[x_var]], y=.data[[y_var]], fill=GT, group=GT_id))
       plttitle <- "slices combined"
       
     }
     
-    # plt2 <- plt2 +
-    #   geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
-    #    facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
-    #   scale_fill_manual(values = colors2) +
-    #  scale_color_manual(values = colors2) +
-    #  scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-    #   geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) +
-    #   labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
-    #   theme_bw() +
-    #    theme(axis.text=element_text(size=labelsize),
-    #          axis.text.x=element_text(size=labelsize),
-    #          axis.text.y=element_text(size=labelsize),
-    #          axis.title=element_text(size=labelsize),
-    #          legend.key.size=unit(1.5, 'cm'),
-    #          legend.title=element_text(size=14),
-    #          legend.text=element_text(size=12),
-    #          plot.title=element_text(size=17),
-    #          strip.text=element_text(size=labelsize)) +
-    #    geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
-    #                           position=position_dodge(width=0.75),
-    #                           show.legend=F,
-    #              size=5, angle=90, fontface="bold") +
-    #  geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
-    #            size=5)
-    # 
-    # # add comparisons separately -- ignore the 'combined' group
-    # plt2 <- plt2 +
-    #     stat_compare_means(label = "p.format", method = "wilcox.test", size = pvalsize,
-    #                  data = subset(df, Sex != "Combined"))
-    
-    
-   # Change plt1 and plt2 to use the same visualization as plt3
-        plt2 <- plt2 +
-      # geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
-          geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) 
-        
-        if (plot_GT_separate) {
-          plt2 <- plt2 +
-           facet_wrap(~ GT, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F", WT="WT", Hz="Hz")), scales="free_x") 
-        } else {
-          plt2 <- plt2 +
-           facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x")
-        }
-        
-        plt2 <- plt2 +
-      # scale_fill_manual(values = colors2) +
-     scale_color_manual(values = colors2) +
-     scale_x_discrete(limits = levels(df[,x_var, drop=T])) 
-        
-        if (plot_GT_separate) {
-          plt2 <- plt2 +
-            stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-            stat_summary(fun = 'median', geom = 'line', aes(group = Sex, color = Sex), size = 1.5)
-          
-        } else {
-          plt2 <- plt2 +
-            stat_summary(fun = "median", fun.min = "median", fun.max= "median", size= 0.5, width = 0.3, geom = "crossbar")+
-            stat_summary(fun = 'median', geom = 'line', aes(group = GT, color = GT), size = 1.5)
-          
-        }
-        plt2 <- plt2 +
-      # geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
+    plt2 <- plt2 +
+      geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
+      facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
+      scale_fill_manual(values = colors2) +
+      scale_color_manual(values = colors2) +
+      scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
+      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
       labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
       theme_bw() +
-       theme(axis.text=element_text(size=labelsize),
-             axis.text.x=element_text(size=labelsize),
-             axis.text.y=element_text(size=labelsize),
-             axis.title=element_text(size=labelsize),
-             legend.key.size=unit(1.5, 'cm'),
-             legend.title=element_text(size=14),
-             legend.text=element_text(size=12),
-             plot.title=element_text(size=17),
-             strip.text=element_text(size=labelsize)) 
-       # geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
-       #                        position=position_dodge(width=0.75),
-       #                        show.legend=F,
-       #           size=5, angle=90, fontface="bold") +
-      if (!plot_GT_separate) {
-        plt2 <- plt2 +
-     geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
-               size=5, color='black')
-    plt2 <- plt2 +
-        stat_compare_means(label = "p.format", method = "wilcox.test", size = pvalsize,
-                     data = subset(df, Sex != "Combined"))
-      }
-     
+      theme(axis.text=element_text(size=labelsize),
+            axis.text.x=element_text(size=labelsize),
+            axis.text.y=element_text(size=labelsize),
+            axis.title=element_text(size=labelsize),
+            legend.key.size=unit(1.5, 'cm'),
+            legend.title=element_text(size=14),
+            legend.text=element_text(size=12),
+            plot.title=element_text(size=17),
+            strip.text=element_text(size=labelsize)) +
+      geom_text(data=idlabdat2_use, aes(label=as.character(id), y=ypos),
+                position=position_dodge(width=0.75),
+                show.legend=F,
+                size=5, angle=90, fontface="bold") +
+      geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
+                size=5)
+    
     # add comparisons separately -- ignore the 'combined' group
+    plt2 <- plt2 +
+      stat_compare_means(label = "p.format", method = "wilcox.test", size = pvalsize,
+                         data = subset(df, Sex != "Combined"))
     
-    
-    
-    # Just set colors2 back to 'normal'.
-    colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D") 
     
     plt3 <- ggplot(filter(df, Sex != "Combined"), aes(x=.data[[x_var]], y = .data[[y_var]], color = GT)) +
       geom_jitter(position=position_jitter(seed=42, width=0.2), alpha=0.6, size=ptsize) +
@@ -659,7 +518,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
   } else if (length(unique(df$slice)) == 3) {
     # plot 1 with all slices separate
     colors1 <- c("WT.1" = "#00BFC4", "WT.2" = "#7CAE00", "WT.3" = "#CD9600",
-              "Hz.1" = "#F8766D", "Hz.2" = "#E76BF3", "Hz.3" = "#00A9FF")
+                 "Hz.1" = "#F8766D", "Hz.2" = "#E76BF3", "Hz.3" = "#00A9FF")
     
     plt1 <- ggplot(df, aes(x=as.factor(Day), y=.data[[y_var]], fill=interaction(GT, slice))) +
       geom_boxplot(outlier.shape=NA) +
@@ -667,13 +526,13 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       geom_jitter(position=ggbeeswarm::position_beeswarm(cex=1.5, dodge.width=0.75)) +
       labs(x="Days", y="Percent", fill="GT/slice", title=calcKey[[y_var]]) +
       theme_bw() +
-       theme(axis.text=element_text(size=labelsize))
+      theme(axis.text=element_text(size=labelsize))
     
     # plot 2 with slice 2 and 3 together
     df$slice_combine <- ifelse(df$slice %in% c(2,3), "2&3", df$slice)
     df$slice_combine <- factor(df$slice_combine, levels=c("1", "2&3"))
     colors2 <- c("WT.1" = "#00BFC4", "WT.2&3" = "#CCCCCC",
-              "Hz.1" = "#F8766D", "Hz.2&3" = "#6B6B6B") 
+                 "Hz.1" = "#F8766D", "Hz.2&3" = "#6B6B6B") 
     
     plt2 <- ggplot(df, aes(x=as.factor(Day), y=.data[[y_var]], fill=interaction(GT, slice_combine))) +
       geom_boxplot(outlier.shape=NA) +
@@ -681,7 +540,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       geom_jitter(position=ggbeeswarm::position_beeswarm(cex=1.5, dodge.width=0.75)) +
       labs(x="Days", y="Percent", fill="GT/slice", title=calcKey[[y_var]]) +
       theme_bw() +
-       theme(axis.text=element_text(size=labelsize))#+
+      theme(axis.text=element_text(size=labelsize))#+
     
     # plot 3 with all slices combined
     colors3 <- c("WT"="#DCDCDC", "Hz"="#778899")
@@ -692,7 +551,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       labs(x="Days", y="Percent", title=calcKey[[y_var]]) +
       theme_bw() + 
       stat_compare_means(label="p.format", method="t.test", size=pvalsize) +
-       theme(axis.text=element_text(size=labelsize))
+      theme(axis.text=element_text(size=labelsize))
     
     pltlst <- list(plt1, plt2, plt3)
     
@@ -707,7 +566,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
     df$GT_id <- factor(df$GT_id, levels=factor_order2)
     
     colors2 <- c("WT" = "#00BFC4", "Hz" = "#F8766D")
-  
+    
     plt1 <- NULL
     
     # label data
@@ -724,31 +583,31 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       distinct() %>% 
       filter(Sex == "Combined")
     
-   plt2 <- ggplot(df, aes(x=as.factor(Day), y=.data[[y_var]], fill=GT)) +
+    plt2 <- ggplot(df, aes(x=as.factor(Day), y=.data[[y_var]], fill=GT)) +
       geom_boxplot(outlier.shape=NA, position=position_dodge(width=0.75)) +
-       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F"))) +
+      facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F"))) +
       scale_fill_manual(values = colors2) +
-     scale_color_manual(values = colors2) +
-       scale_x_discrete(limits = levels(df$Day)) +
+      scale_color_manual(values = colors2) +
+      scale_x_discrete(limits = levels(df$Day)) +
       geom_quasirandom(aes(color=NULL), dodge.width=0.75, width=0.02, varwidth=T, groupOnX=T, size=3) +
-     # add trendline
-     geom_smooth(aes(group=GT, color=GT), method="loess", se=TRUE, position=position_dodge(width=0.75)) +
+      # add trendline
+      geom_smooth(aes(group=GT, color=GT), method="loess", se=TRUE, position=position_dodge(width=0.75)) +
       labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "-- aggregate calculation over sums across both replicate slices")) +
       theme_bw() +
-       theme(axis.text=element_text(size=labelsize),
-             axis.text.x=element_text(size=labelsize),
-             axis.text.y=element_text(size=labelsize),
-             axis.title=element_text(size=labelsize),
-             legend.key.size=unit(1.5, 'cm'),
-             legend.title=element_text(size=14),
-             legend.text=element_text(size=12),
-             plot.title=element_text(size=17),
-             strip.text=element_text(size=labelsize)) +
- 
-     geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(.data[["p_value"]], scientific=T, digits=3))), 
-                                      y=ypos), 
-               size=5, color="#000000")
-     
+      theme(axis.text=element_text(size=labelsize),
+            axis.text.x=element_text(size=labelsize),
+            axis.text.y=element_text(size=labelsize),
+            axis.title=element_text(size=labelsize),
+            legend.key.size=unit(1.5, 'cm'),
+            legend.title=element_text(size=14),
+            legend.text=element_text(size=12),
+            plot.title=element_text(size=17),
+            strip.text=element_text(size=labelsize)) +
+      
+      geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(.data[["p_value"]], scientific=T, digits=3))), 
+                                       y=ypos), 
+                size=5, color="#000000")
+    
     # add comparisons separately -- ignore the 'combined' group
     plt2 <- plt2 +
       stat_compare_means(label="p.format", method="wilcox.test", size=pvalsize,
@@ -775,6 +634,8 @@ createOuts <- function(datfls, formnms, dapithresh=1000) {
   outputdat <- lapply(datfls, read_xlsx)
   outnms1 <- lapply(strsplit(datfls, "/"), function(x) {
     # protein/stain name is now a parent directory. extract that name and add onto the ids with a "_"
+    # should always be the last 2, if I remove any strsplit entries that are blank..
+    x <- x[x != ""]
     paste(x[c((length(x)-1), (length(x)-2))], collapse="_")
   })
   names(outputdat) <- unlist(outnms1)
@@ -846,7 +707,7 @@ processSection <- function(sumout, slice, type, minfo, sex_analyze) {
 
 
 processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p_correct=TRUE, plotallagg, ptsize=0.9, pvalsize=5, labelsize=12, rm_outliers=TRUE,
-                      make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE, plot_GT_separate=FALSE) {
+                      make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
   if (is.null(df)) {
     return(NULL)
   }
@@ -858,21 +719,28 @@ processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p
   df_copy <- df
   df_copy$Sex <- "Combined"
   df_new <- rbind(df, df_copy)
-
   
   # account for new sex_orig param
   plot_vars <- names(df_new)[start_idx:(ncol(df_new) - 1)]
   # remove where the main stain is in the denominator
   plot_vars <- plot_vars[!grepl("^lcn2_express|^krt8_express", plot_vars, perl=T)]
+  # remove col_var from plot_vars
+  if (!is.null(col_var)) {
+    plot_vars <- plot_vars[-which(plot_vars == col_var)]
+  }
   # use only variables that aren't just all NAs or 0s
   chkvars <- unlist(lapply(plot_vars, function(x) {all(is.na(df_new[,x]) | df_new[,x] == 0)}))
   names(chkvars) <- plot_vars
   plot_vars <- names(chkvars[which(!chkvars)])
-  plot_lst <- plot_vars %>% 
+  plot_lst <- plot_vars %>%
     map(~ plotInLoop_multi(df_new, .x, x_var=x_var, col_var=col_var, calcKey = calc_key, show_p_correct=show_p_correct, rm_outliers=rm_outliers, plotfull = FALSE, ptsize=ptsize,
-                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig,
-                           plot_GT_separate=plot_GT_separate)) %>% 
+                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig)) %>%
     try(., silent = TRUE)
+  # for (v in plot_vars) {
+  #   print(v)
+  #   a = plotInLoop_multi(df_new, v, x_var=x_var, col_var=col_var, calcKey = calc_key, show_p_correct=show_p_correct, rm_outliers=rm_outliers, plotfull = FALSE, ptsize=ptsize,
+  #                        plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig)
+  # }
   
   return(list(df=df_new, plot_lst=plot_lst, plot_vars=plot_vars))
 }
