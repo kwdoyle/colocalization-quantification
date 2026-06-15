@@ -1,5 +1,6 @@
 import os
 import sys
+import yaml
 import pandas as pd
 import skimage.io as io
 import colocalized_cell_count_functions as count
@@ -38,18 +39,34 @@ def save_section_figs(section_img, section_name, section_num):
 basedir = os.path.normpath(sys.argv[1])
 savedir = os.path.normpath(sys.argv[2])
 toprocess = os.path.normpath(sys.argv[3])
+if len(sys.argv) > 4:
+    stain_name = os.path.normpath(sys.argv[4])
+    nm_use = stain_name
+else:
+    stain_name = toprocess
+    nm_use = "notused"
+param_file = os.path.normpath(sys.argv[5])
 
-min_clean_size = 5
-close_radius = 3
-min_watershed_dist = 15
-dapi_watershed = 7
-spc_watershed = 15
-spc_cleansize = 1
-sigma = 0.5
-spc_sigma = 0.2
-erdr1_sigma = 0.2
-spc_dilate = 10
-font = 15
+# use separate input files containing these parameters for each stain type
+with open(param_file, "r") as f:
+    cfg = yaml.safe_load(f)
+
+p = cfg.get("params", {})
+
+min_clean_size = p['min_clean_size'] #5
+close_radius = p['close_radius'] #3
+min_watershed_dist = p['min_watershed_dist'] #15
+dapi_watershed = p['dapi_watershed'] #7
+main_watershed = p['main_watershed'] #8
+dapi_main_watershed = p['dapi_main_watershed'] #8
+spc_watershed = p['spc_watershed'] #15
+spc_cleansize = p['spc_cleansize']  #1  #10  #1  # 5  # 1
+sigma = p['sigma'] #0.5
+main_sigma = p['main_sigma']  #0
+spc_sigma = p['spc_sigma']  # 0.2
+spc_dilate = p['spc_dilate']  # 0  # 1  # 10
+font = p['font']  # 15
+dapi_colocalize = p['dapi_colocalize']  # True
 
 
 # pull out the ID (the last folder name in the basedir argument) and use it in the output file name
@@ -141,7 +158,6 @@ if toprocess == "rfp":
       flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.xlsx'
       alldat.to_excel(savedir + '/out_sep/' + flnmtmp, index=False)
   
-  
 elif toprocess == "lcn2":
   os.makedirs(savedir + "/sections/", exist_ok=True)
   os.makedirs(savedir + "/out_sep/", exist_ok=True)
@@ -205,7 +221,76 @@ elif toprocess == "lcn2":
       flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.xlsx'
       alldat.to_excel(savedir + '/out_sep/' + flnmtmp, index=False)
 
-  
+elif toprocess == "nuclear_stain":
+    os.makedirs(savedir + "/sections/", exist_ok=True)
+    os.makedirs(savedir + "/out_sep/", exist_ok=True)
+    os.makedirs(savedir + "/sections/main/", exist_ok=True)
+    os.makedirs(savedir + "/sections/tdt/", exist_ok=True)
+    os.makedirs(savedir + "/sections/dapi/", exist_ok=True)
+    os.makedirs(savedir + "/sections/spc/", exist_ok=True)
+    os.makedirs(savedir + "/sections/full/", exist_ok=True)
+
+    dapi_fl = [fl for fl in fls if "dapi" in fl.lower() and all(x.lower() not in fl.lower() for x in ['spc', 'tdt', 'merging', 'merged'])]
+    spc_fl = [fl for fl in fls if "spc" in fl.lower() and all(x.lower() not in fl.lower() for x in ['dapi', 'tdt', 'rosa', 'merging', 'merged'])]
+    tdt_fl = [fl for fl in fls if "rosa" in fl.lower() and all(x.lower() not in fl.lower() for x in ['dapi', 'merging', 'merged'])]
+    main_fl = [fl for fl in fls if stain_name in fl.lower() and all(x.lower() not in fl.lower() for x in ['dapi', 'tdt', 'spc', 'merging', 'merged', 'rab'])]
+    rab_fl = [fl for fl in fls if "rab" in fl.lower() and all(x.lower() not in fl.lower() for x in ['dapi', 'tdt', 'spc', 'merging', 'merged'])]
+    full_fl = [fl for fl in fls if "merg" in fl.lower()]
+    print("DAPI: " + str(dapi_fl))
+    print("spc: " + str(spc_fl))
+    print("tdt: " + str(tdt_fl))
+    print(stain_name + ": " + str(main_fl))
+    print("full: " + str(full_fl))
+    
+    dapi_img_split = process_file(dapi_fl)
+    main_img_split = process_file(main_fl)
+    full_img_split = process_file(full_fl)
+
+    if len(spc_fl) > 0:
+        spc_img_split = process_file(spc_fl)
+    else:
+        spc_img_split = None
+    if len(tdt_fl) > 0:
+        tdt_img_split = process_file(tdt_fl)
+    else:
+        tdt_img_split = None
+
+    section_dat = pd.DataFrame()
+    for i in range(0, len(main_img_split)):
+        print("Processing section " + str(i))
+        main_sec = main_img_split[i]
+        tdt_sec  = tdt_img_split[i]
+        dapi_sec = dapi_img_split[i]
+        spc_sec  = spc_img_split[i]
+        full_sec = full_img_split[i]
+    
+        section = i+1
+        try:
+            main_out = count.main(spc_img=spc_sec, tdt_img=tdt_sec, dapi_img=dapi_sec, main_img=main_sec, to_process="nuclear_stain",
+                                min_clean_size=min_clean_size, close_radius=close_radius, spc_watershed=spc_watershed, spc_sigma=spc_sigma, 
+                                main_watershed=main_watershed, dapi_main_watershed=dapi_main_watershed,
+                                min_watershed_dist=min_watershed_dist, dapi_watershed=dapi_watershed, spc_dilate=spc_dilate, spc_cleansize=spc_cleansize, sigma=sigma, main_sigma=main_sigma,
+                                main_nm=stain_name,
+                                dapi_colocalize=dapi_colocalize,
+                                plot=True, savedir=savedir, section=section, font=font)
+        except ValueError as e:
+            print(e)
+            continue
+
+        alldat = main_out
+        alldat['section'] = i + 1
+
+        section_dat = pd.concat([section_dat, alldat], ignore_index=True)
+
+
+        count.savefig(main_sec, savedir + "/sections/main/" + "lcn2_" + str(section) + ".png")
+        count.savefig(dapi_sec, savedir + "/sections/dapi/" + "dapi_" + str(section) + ".png")
+        count.savefig(full_sec, savedir + "/sections/full/" + "full_" + str(section) + ".png")
+        if (len(tdt_fl) > 0):
+            count.savefig(tdt_sec, savedir + "/sections/tdt/" + "tdt_" + str(section) + ".png")
+        if len(spc_fl) > 0:
+            count.savefig(spc_sec, savedir + "/sections/spc/" + "spc_" + str(section) + ".png")
+
 else:
   raise ValueError("Invalid 'toprocess' argument")
 
