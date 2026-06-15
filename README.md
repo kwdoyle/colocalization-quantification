@@ -16,15 +16,25 @@ Watershed segmentation is then applied to delineate and count individual cells.
 Colocalization is assessed by identifying overlaps between masks of different fluorescent proteins.
 Subsections are filtered to ensure tissue relevance: any subsection with fewer than 1,000 dapi-positive cells or 10 tdt-positive cells is discarded.
 
+Improvements made in this branch simplify the pipeline. 
+
 To execute the full analysis, use the following command:
 
-`bash main.sh 'to_process' 'image_dir'`
+`bash main.sh 'to_process' 'image_dir' 'stain name' 'analysis param yaml file'`
 
-'to_process' specifies the fluorescent protein to analyze (e.g., 'lcn2', 'krt8', 'rfp').
-'image_dir' is the path to the directory containing images for analysis. This directory should include subdirectories for each individual, with separate images for each fluorescent protein.
+Each parameter is as follows:
+
+`to_process`: possible values: 'nuclear_stain'  (specifies whether stain to analyze is localized within the nucleus or not. Note: only nuclear stain is currently implemented.)   the fluorescent protein to analyze (e.g., 'lcn2', 'krt8', 'rfp').
+
+`image_dir`: possible values: a quoted path to the directory containing subdirectories for each mouse ID, containing separate images for each fluorescent protein.
+
+`stain name`: possible values: a single quoted string with the name of the stain being analyzed, e.g., 'erdr1', 'lcn2', 'krt8'
+
+`analysis param yaml file1`: a .yaml file containing values for each of the image processing parameters for the current stain being analyzed (see files in ./parameters/ for examples)
 
 #### Data Visualization:
 Summary boxplots showing colocalization percentages are generated using the following RMarkdown scripts:
 
 `./Rscripts/lcn2_count_summary.Rmd`
+
 `./Rscripts/rfp_count_summary.Rmd`
