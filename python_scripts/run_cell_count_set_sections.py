@@ -3,7 +3,7 @@ import sys
 import yaml
 import pandas as pd
 import skimage.io as io
-from python_scripts import colocalized_cell_count_functions as count
+import colocalized_cell_count_functions as count
 
 
 def subset_img(img):
