@@ -1,0 +1,205 @@
+---
+title: "ERDR1 Colocalization"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r htmlsetup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r functions, include=FALSE}
+library(tidyverse)
+library(readxl)
+library(MASS)
+library(knitr)
+library(kableExtra)
+library(ggbeeswarm)
+library(gridExtra)
+library(ggpubr)
+source(here::here("./Rscripts/colocalization_functions.R"))
+
+```
+
+
+```{r datasetup, include=FALSE, warning=FALSE, message=FALSE}
+
+sex_analyze <- c("M", "F")
+correct_p <- TRUE
+plot_all_agg <- TRUE 
+shownewplot <- TRUE 
+showsections <- TRUE 
+correctp <- TRUE 
+toprocess <- "erdr1"
+
+# key for calculations
+erdr1_calc_key <- list(dapi_express_main = "main dapi / dapi",
+                      tdt_express_spc = "tdt spc / tdt",
+                      spc_express_tdt = "tdt spc / spc",
+                      dapi_express_tdt_spc = "tdt spc / dapi",
+                      dapi_express_tdt = "tdt / dapi",
+                      dapi_express_spc = "spc / dapi",
+                      tdt_express_main = "main dapi tdt / tdt",
+                      tdt_express_main_spc = "main dapi tdt spc / tdt",
+                      spc_express_main_tdt = "main dapi tdt spc / spc",
+                      spc_express_main = "main dapi spc / spc"
+                      )
+                      
+
+
+formlst <- list(erdr1=erdr1_calc_key)
+
+# Note: to run this summary script, will need to provide this table of sample IDs
+# columns should include: 'Day' (day sample was harvested), 'ID' (the numeric sample ID), 'GT' (sample genotype),
+# 'Sex' (sex of sample), and 'BleoDose' (amount of bleomycin sample received) or 'Virus' (GT of AAV sample received)
+mouseinfo <- read_xlsx(paste0(here::here(), "/mouse_id_info.xlsx"), sheet="ERDR1")
+outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.xlsx", recursive = T, full.names = T)
+
+# separate out the additional sections to look at separately
+outputs_all <- outputs_raw[!grepl("out_sep", outputs_raw)] 
+outputs_all <- outputs_raw[!grepl("testing", outputs_raw)] 
+outputs_all <- outputs_all[grep(toprocess, outputs_all)]
+
+# separate out the additional sections to look at separately
+outputs <- outputs_all[!grepl("addtl_sections", outputs_all)]
+
+outs_sec1 <- createOuts(datfls=outputs, formnms=formlst, dapithresh=1000)
+sumOuts_sec1 <- outs_sec1$split_section_output
+slices <- 1  #1:3
+
+sumOuts_list <- list(sumOuts_sec1)
+
+# Process each section and bind the results
+erdr1_df1 <- map2_dfr(sumOuts_list, slices, ~ processSection(.x, .y, "erdr1", mouseinfo, sex_analyze))
+
+# set order
+basenms_select <- c("section", "id", "type", "slice", "Day", "GT", "Sex")  #, "BleoDose")
+if (nrow(erdr1_df1) > 0) {
+  erdr1_df1 <- erdr1_df1 %>%
+    dplyr::select(any_of(basenms_select),everything())
+}
+
+
+erdr1_start_idx <- min(grep('express', names(erdr1_df1)))
+
+# erdr1
+# change the 'main' names to 'erdr1'
+names(erdr1_df1) <- gsub("main", "erdr1", names(erdr1_df1))
+erdr1_calc_key <- lapply(erdr1_calc_key, function(x) gsub("main", "erdr1", x))
+names(erdr1_calc_key) <- gsub("main", "erdr1", names(erdr1_calc_key))
+
+erdr1_df1 <- erdr1_df1[,-which(names(erdr1_df1) == "Virus")]
+# remove 'dapi' from names if dapi_colocalize is false
+if (all(erdr1_df1$dapi_colocalize == FALSE)) {
+  # remove dapi from names
+  erdr1_calc_key <- lapply(erdr1_calc_key, function(x) {
+    parts <- strsplit(x, "/", fixed = TRUE)[[1]]
+  
+    left  <- trimws(gsub("\\bdapi\\b", "", parts[1]))   # remove "dapi" ONLY on the left
+    right <- trimws(parts[2])                           # preserve right side exactly
+  
+    paste(left, right, sep = " / ")
+  })
+}
+
+erdr1_plt_out <- processDF(df=erdr1_df1, calc_key=erdr1_calc_key, start_idx=erdr1_start_idx, plotallagg=plot_all_agg,
+                          show_p_correct=correctp, labelsize=20, ptsize=1.5, rm_outliers=F, makemainfig=F,
+                          col_var="BleoType")
+erdr1_df <- erdr1_plt_out$df
+
+# Note: plot_out_X is a nested list of N long, where N is the number of parameters (erdr1 tdt spc / tdt, etc.) analyzed.
+# For each of these, there is another list of 2 long, containing the plots and the wilcox test summaries.
+# The plot length is 3
+plot_vars_erdr1 <- erdr1_plt_out$plot_vars
+plot_out_erdr1 <- erdr1_plt_out$plot_lst
+plot_lst_erdr1 <- lapply(plot_out_erdr1, `[[`, 1)  # taking the 'plots' element of the list
+plot_tst_erdr1 <- lapply(plot_out_erdr1, `[[`, 2)  # taking the 'tests' element of the list
+dayGTtests_erdr1.l <- lapply(plot_tst_erdr1, `[[`, 1)
+# full test df
+dayGTtests_erdr1 <- bind_rows(dayGTtests_erdr1.l)
+# check data in test
+dayGTtests_erdr1.plots.l <- lapply(plot_tst_erdr1, `[[`, 2)
+names(dayGTtests_erdr1.plots.l) <- sapply(plot_tst_erdr1, function(x) unique(x$wilcoxdf$param))
+
+
+all_dfs <- list(erdr1=erdr1_df)
+
+funckeys <- list(erdr1=erdr1_calc_key)
+
+# if tests don't exist, set to NULL
+# if (nrow(dayGTtests_erdr1) != 0) {
+#   erdr1tst <- dayGTtests_erdr1
+# } else {
+  erdr1tst <- NULL
+# }
+
+```
+
+#### Plotting percentages calculated per each 9x4 section with DAPI count > 0; SPC > 10; tdt > 10
+
+# erdr1
+## Analysis of `r ifelse(sex_analyze == "M", yes="Male", no=ifelse(sex_analyze == "F", yes="Female", no="NA"))` mice treated with `r unique(erdr1_df$BleoDose)` U/kg bleomycin
+
+```{r info_erdr1, echo=FALSE, message=FALSE, eval=showsections}
+if (!is.null(erdr1_df) & 'section' %in% names(erdr1_df)) {
+  print(paste("IDs:", paste(unique(erdr1_df$id), collapse=", ")))
+  print(paste("Sex:", paste(unique(erdr1_df$Sex), collapse=", ")))
+  sectiondf1 <- erdr1_df %>% 
+    group_by(id, slice) %>% 
+    summarise(sections_used = paste(unique(section), collapse=", "))
+  kable(sectiondf1)
+}
+```
+
+
+#### Wilcoxon-Mann-Whitney test performed on 'slices combined' compare GT across mice per day
+#### and GT per day between males and females, separately
+
+```{r plot_main_erdr1AAA, fig.height=10, fig.width=19, echo=FALSE, warning=FALSE, message=FALSE, results='hide', eval=shownewplot}
+if (!is.null(erdr1_df)) {
+  # good dims: 6x17
+  # new good dims: height=27, width=17
+  # note: dimensions of plots are designed to view after knitting
+  
+  if (class(plot_lst_erdr1) != "try-error") {
+    for (pltgrp in plot_lst_erdr1) {
+      heights <- c(1, 2)
+      newgrp <- pltgrp[-3]
+      print(newgrp)
+      cat('\n\n\n\n')
+    }
+  } else {
+    print(paste("No data for sex", sex_analyze))
+  }
+}
+```
+
+
+
+
+### Wilcoxon-Mann-Whitney test
+##### Table shows test of GT per day for 'M+F slices combined'
+##### Bonferroni corrected across all `r length(unique(erdr1tst$Day))` day observations at alpha = 0.05
+##### separately for each `r length(unique(erdr1tst$param))` parameters tested for erdr1 for GT per day
+##### alpha~new~ = 0.05 / `r length(unique(erdr1tst$Day))` = `r 0.05 / length(unique(erdr1tst$Day))`
+
+
+```{r erdr1test, echo=FALSE}
+  if (!is.null(erdr1tst)) {
+    kable(erdr1tst) %>% 
+      kable_styling %>% 
+      row_spec(which(erdr1tst$p_signif == 1), bold=T, hline_after=T, background="lightgrey") %>% 
+      remove_column(which(names(erdr1tst) == "p_signif"))
+  } else if (exists("erdr1_aov")) {  # not needed if not running anova
+    kable(erdr1_aov) %>% 
+      kable_styling %>% 
+      row_spec(which(erdr1_aov$p < 0.05), bold=T, hline_after=T, background="lightgrey")
+    kable(erdr1_aov) %>% 
+      kable_styling %>% 
+      row_spec(which(erdr1_aov$p < 0.05), bold=T, hline_after=T, background="lightgrey")
+  } else {
+    print("No comparison results for erdr1")
+  }
+
+```
