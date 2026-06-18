@@ -104,7 +104,7 @@ if (all(erdr1_df1$dapi_colocalize == FALSE)) {
 }
 
 erdr1_plt_out <- processDF(df=erdr1_df1, calc_key=erdr1_calc_key, start_idx=erdr1_start_idx, plotallagg=plot_all_agg,
-                          show_p_correct=correctp, labelsize=20, ptsize=1.5, rm_outliers=F, makemainfig=F,
+                          show_p_correct=correctp, labelsize=20, ptsize=1.5, rm_outliers=F, makemainfig=T,
                           col_var="BleoType")
 erdr1_df <- erdr1_plt_out$df
 
