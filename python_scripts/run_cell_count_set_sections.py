@@ -71,7 +71,7 @@ dapi_colocalize = p['dapi_colocalize']  # True
 
 # pull out the ID (the last folder name in the basedir argument) and use it in the output file name
 id_nm = os.path.normpath(basedir).split(os.sep)[-1]
-flnm = '/' + id_nm + '_' + 'count_output.xlsx'
+flnm = '/' + id_nm + '_' + 'count_output.csv'
 
 if os.path.exists(savedir + flnm):
     print("File already analyzed")
@@ -155,8 +155,8 @@ if toprocess == "rfp":
       save_section_figs(full_sec, "full", section)
   
   
-      flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.xlsx'
-      alldat.to_excel(savedir + '/out_sep/' + flnmtmp, index=False)
+      flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.csv'
+      alldat.to_csv(savedir + '/out_sep/' + flnmtmp, index=False)
   
 elif toprocess == "lcn2":
   os.makedirs(savedir + "/sections/", exist_ok=True)
@@ -218,8 +218,8 @@ elif toprocess == "lcn2":
       count.savefig(spc_sec, savedir + "/sections/spc/" + "spc_" + str(section) + ".png")
       count.savefig(full_sec, savedir + "/sections/full/" + "full_" + str(section) + ".png")
   
-      flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.xlsx'
-      alldat.to_excel(savedir + '/out_sep/' + flnmtmp, index=False)
+      flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.csv'
+      alldat.to_csv(savedir + '/out_sep/' + flnmtmp, index=False)
 
 elif toprocess == "nuclear_stain":
     os.makedirs(savedir + "/sections/", exist_ok=True)
@@ -290,6 +290,9 @@ elif toprocess == "nuclear_stain":
             count.savefig(tdt_sec, savedir + "/sections/tdt/" + "tdt_" + str(section) + ".png")
         if len(spc_fl) > 0:
             count.savefig(spc_sec, savedir + "/sections/spc/" + "spc_" + str(section) + ".png")
+      
+        flnmtmp = '/' + id_nm + '_' + 'sec_' + str(section) + '_count_output.csv'
+        alldat.to_csv(savedir + '/out_sep/' + flnmtmp, index=False)
 
 else:
   raise ValueError("Invalid 'toprocess' argument")
@@ -299,4 +302,4 @@ else:
 secnum = section_dat.pop('section')
 section_dat.insert(0, 'section', secnum)
 # save section data
-section_dat.to_excel(savedir + flnm, index=False)
+section_dat.to_csv(savedir + flnm, index=False)

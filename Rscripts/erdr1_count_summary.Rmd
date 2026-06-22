@@ -54,7 +54,7 @@ formlst <- list(erdr1=erdr1_calc_key)
 # columns should include: 'Day' (day sample was harvested), 'ID' (the numeric sample ID), 'GT' (sample genotype),
 # 'Sex' (sex of sample), and 'BleoDose' (amount of bleomycin sample received) or 'Virus' (GT of AAV sample received)
 mouseinfo <- read_xlsx(paste0(here::here(), "/mouse_id_info.xlsx"), sheet="ERDR1")
-outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.xlsx", recursive = T, full.names = T)
+outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
 
 # separate out the additional sections to look at separately
 outputs_all <- outputs_raw[!grepl("out_sep", outputs_raw)] 
