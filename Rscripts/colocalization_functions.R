@@ -86,7 +86,7 @@ autoCountSumNamed <- function(df, id, formnms, dapi_thresh = 1000, tdt_thresh = 
 }
 
 
-autoFullSumNamed <- function(df, formnms, rm_names = c("section", "id", "type"), dapi_thresh = 1000, tdt_thresh = 10) {
+autoFullSumNamed <- function(df, formnms, rm_names = c("section", "id", "type", "dapi_colocalize"), dapi_thresh = 1000, tdt_thresh = 10) {
   # Remove low DAPI count and bad sections
   df1 <- df %>%
     filter(n_dapi >= dapi_thresh, n_tdt > tdt_thresh)
@@ -153,6 +153,14 @@ dayGTcompare <- function(day, d, yvar, xvar="Day") {
 
 plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_outliers=TRUE, show_p_correct=TRUE, plotfull=FALSE, 
                              plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
+  
+  # Should be able to do something like
+  nm_use <- calcKey[[y_var]]
+  if (unique(df$dapi_colocalize) == "False") {
+    nm_use <- gsub("\\bdapi\\b(?=[^/]*?/)", "", nm_use, perl = TRUE)
+  }
+  # and then use this nm_use in the labs arg of the plot below
+  
   if (show_p_correct) {
     pcoluse <- "p_adj"
   } else {
@@ -412,7 +420,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       scale_fill_manual(values = colors2) +
       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
       geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
-      labs(x="Days", y="Percent", fill="GT", title=paste(calcKey[[y_var]], "-- separate slices")) +
+      labs(x="Days", y="Percent", fill="GT", title=paste(nm_use, "-- separate slices")) +
       theme_bw() +
       theme(axis.text=element_text(size=labelsize),
             axis.text.x=element_text(size=labelsize),
@@ -466,7 +474,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       scale_color_manual(values = colors2) +
       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
       geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
-      labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "--", plttitle)) +
+      labs(x="Days", y="Percent", title=paste(nm_use, "--", plttitle)) +
       theme_bw() +
       theme(axis.text=element_text(size=labelsize),
             axis.text.x=element_text(size=labelsize),
@@ -505,7 +513,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
             legend.text=element_text(size=12),
             plot.title=element_text(size=labelsize + 5),
             strip.text=element_text(size=labelsize)) +
-      labs(x="Days after Bleomycin", title=paste(calcKey[[y_var]])) +
+      labs(x="Days after Bleomycin", title=paste(nm_use)) +
       scale_y_continuous(labels = function(x) paste0(x, "%")) +
       theme(axis.title.y = element_blank()) +
       geom_text(data=gttestlabdat, aes(label=paste("p =", as.character(format(get(pcoluse), scientific=T, digits=3))), y=ypos),
@@ -592,7 +600,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       geom_quasirandom(aes(color=NULL), dodge.width=0.75, width=0.02, varwidth=T, groupOnX=T, size=3) +
       # add trendline
       geom_smooth(aes(group=GT, color=GT), method="loess", se=TRUE, position=position_dodge(width=0.75)) +
-      labs(x="Days", y="Percent", title=paste(calcKey[[y_var]], "-- aggregate calculation over sums across both replicate slices")) +
+      labs(x="Days", y="Percent", title=paste(nm_use, "-- aggregate calculation over sums across both replicate slices")) +
       theme_bw() +
       theme(axis.text=element_text(size=labelsize),
             axis.text.x=element_text(size=labelsize),
@@ -631,7 +639,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
 
 
 createOuts <- function(datfls, formnms, dapithresh=1000) {
-  outputdat <- lapply(datfls, read_xlsx)
+  outputdat <- lapply(datfls, read.csv)
   outnms1 <- lapply(strsplit(datfls, "/"), function(x) {
     # protein/stain name is now a parent directory. extract that name and add onto the ids with a "_"
     # should always be the last 2, if I remove any strsplit entries that are blank..

@@ -58,7 +58,7 @@ outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.csv", 
 
 # separate out the additional sections to look at separately
 outputs_all <- outputs_raw[!grepl("out_sep", outputs_raw)] 
-outputs_all <- outputs_raw[!grepl("testing", outputs_raw)] 
+# outputs_all <- outputs_raw[!grepl("testing", outputs_raw)] 
 outputs_all <- outputs_all[grep(toprocess, outputs_all)]
 
 # separate out the additional sections to look at separately
@@ -156,7 +156,7 @@ if (!is.null(erdr1_df) & 'section' %in% names(erdr1_df)) {
 #### Wilcoxon-Mann-Whitney test performed on 'slices combined' compare GT across mice per day
 #### and GT per day between males and females, separately
 
-```{r plot_main_erdr1AAA, fig.height=10, fig.width=19, echo=FALSE, warning=FALSE, message=FALSE, results='hide', eval=shownewplot}
+```{r plot_main_erdr1, fig.height=20, fig.width=19, echo=FALSE, warning=FALSE, message=FALSE, results='hide', eval=shownewplot}
 if (!is.null(erdr1_df)) {
   # good dims: 6x17
   # new good dims: height=27, width=17
