@@ -32,6 +32,17 @@ Each parameter is as follows:
 
 `analysis param yaml file1`: a .yaml file containing values for each of the image processing parameters for the current stain being analyzed (see files in ./parameters/ for examples)
 
+`additional subdirectory`: (optional) the name of an additional subdirectory you would like the output saved to. Useful for organizing output of different 'sets' for the same IDs
+
+
+Example usage:
+
+`bash main.sh "nuclear_stain" "/path/to/input/file/directories/" "erdr1" "parameters/erdr1_params.yaml"`
+
+or with extra subdirectory:
+
+`bash main.sh "nuclear_stain" "/path/to/input/file/directories/" "erdr1" "parameters/erdr1_params.yaml" "set_2"`
+
 #### Data Visualization:
 Summary boxplots showing colocalization percentages are generated using the following RMarkdown scripts:
 
