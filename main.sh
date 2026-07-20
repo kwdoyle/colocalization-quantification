@@ -4,6 +4,7 @@ toprocess=$1
 maindir=$2
 stain_name=$3
 param_file=$4
+addtl_subdir=$5
 
 if [ -z "$stain_name" ]; then
     dirnm=$toprocess
@@ -12,7 +13,14 @@ else
 fi
 
 #basedir='./out/'$toprocess
-basedir='./out/'$dirnm
+# normal output dir:
+#basedir='./out/'$dirnm
+# saving to OneDrive instead:
+username=$(whoami)
+basedir="C:/Users/"${username}"/OneDrive - cumc.columbia.edu/Colocalization/out/$dirnm"
+if [[ -n "$addtl_subdir" ]]; then
+    basedir="$basedir/$addtl_subdir"
+fi
 
 echo Looking for ID folders in: $maindir
 echo Will save output in $basedir
