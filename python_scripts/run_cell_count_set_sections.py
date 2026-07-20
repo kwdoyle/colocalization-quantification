@@ -283,7 +283,7 @@ elif toprocess == "nuclear_stain":
         section_dat = pd.concat([section_dat, alldat], ignore_index=True)
 
 
-        count.savefig(main_sec, savedir + "/sections/main/" + "lcn2_" + str(section) + ".png")
+        count.savefig(main_sec, savedir + "/sections/main/" + nm_use + str(section) + ".png")
         count.savefig(dapi_sec, savedir + "/sections/dapi/" + "dapi_" + str(section) + ".png")
         count.savefig(full_sec, savedir + "/sections/full/" + "full_" + str(section) + ".png")
         if (len(tdt_fl) > 0):
