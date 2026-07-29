@@ -151,7 +151,7 @@ dayGTcompare <- function(day, d, yvar, xvar="Day") {
 }
 
 
-plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_outliers=TRUE, show_p_correct=TRUE, plotfull=FALSE, 
+plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_outliers=TRUE, show_p_correct=TRUE, plotfull=FALSE, alpha=1, 
                              plotallagg=FALSE, pvalsize=5, labelsize=12, ptsize=0.9, make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
   
   # Should be able to do something like
@@ -419,7 +419,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       facet_wrap(~ Sex, ncol=1, labeller = as_labeller(c(M="M only", F="F only", Combined="M+F")), scales="free_x") +
       scale_fill_manual(values = colors2) +
       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
+      geom_quasirandom(dodge.width=0.75, width=0.05, alpha=alpha, varwidth=T, groupOnX=T) + #dodge.width=0.95 #width=0.2
       labs(x="Days", y="Percent", fill="GT", title=paste(nm_use, "-- separate slices")) +
       theme_bw() +
       theme(axis.text=element_text(size=labelsize),
@@ -473,7 +473,7 @@ plotInLoop_multi <- function(df, y_var, x_var="Day", col_var=NULL, calcKey, rm_o
       scale_fill_manual(values = colors2) +
       scale_color_manual(values = colors2) +
       scale_x_discrete(limits = levels(df[,x_var, drop=T])) +
-      geom_quasirandom(dodge.width=0.75, width=0.05, varwidth=T, groupOnX=T) + 
+      geom_quasirandom(dodge.width=0.75, width=0.05, alpha=alpha, varwidth=T, groupOnX=T) + 
       labs(x="Days", y="Percent", title=paste(nm_use, "--", plttitle)) +
       theme_bw() +
       theme(axis.text=element_text(size=labelsize),
@@ -643,8 +643,15 @@ createOuts <- function(datfls, formnms, dapithresh=1000) {
   outnms1 <- lapply(strsplit(datfls, "/"), function(x) {
     # protein/stain name is now a parent directory. extract that name and add onto the ids with a "_"
     # should always be the last 2, if I remove any strsplit entries that are blank..
-    x <- x[x != ""]
-    paste(x[c((length(x)-1), (length(x)-2))], collapse="_")
+    # x <- x[x != ""]
+    #paste(x[c((length(x)-1), (length(x)-2))], collapse="_")
+    # try this instead, anchor on where 'out' is:
+    x <- x[nzchar(x)]
+    
+    stain <- x[match("out", x) + 1]
+    id   <- x[length(x) - 1]
+    
+    paste(id, stain, sep = "_")
   })
   names(outputdat) <- unlist(outnms1)
   # add sample id to data frames
@@ -714,7 +721,8 @@ processSection <- function(sumout, slice, type, minfo, sex_analyze) {
 }
 
 
-processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p_correct=TRUE, plotallagg, ptsize=0.9, pvalsize=5, labelsize=12, rm_outliers=TRUE,
+processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p_correct=TRUE, plotallagg, ptsize=0.9, pvalsize=5, labelsize=12, alpha=1,
+                      rm_outliers=TRUE,
                       make_manual_plot=FALSE, ids_rm=NULL, makemainfig=FALSE) {
   if (is.null(df)) {
     return(NULL)
@@ -742,7 +750,7 @@ processDF <- function(df, calc_key, start_idx, x_var="Day", col_var=NULL, show_p
   plot_vars <- names(chkvars[which(!chkvars)])
   plot_lst <- plot_vars %>%
     map(~ plotInLoop_multi(df_new, .x, x_var=x_var, col_var=col_var, calcKey = calc_key, show_p_correct=show_p_correct, rm_outliers=rm_outliers, plotfull = FALSE, ptsize=ptsize,
-                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig)) %>%
+                           plotallagg=plotallagg, pvalsize=pvalsize, labelsize=labelsize, make_manual_plot=make_manual_plot, ids_rm=ids_rm, makemainfig=makemainfig, alpha=alpha)) %>%
     try(., silent = TRUE)
   # for (v in plot_vars) {
   #   print(v)

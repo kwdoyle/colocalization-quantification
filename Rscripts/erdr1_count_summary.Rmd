@@ -32,6 +32,7 @@ shownewplot <- TRUE
 showsections <- TRUE 
 correctp <- TRUE 
 toprocess <- "erdr1"
+dapithresh <- 1000
 
 # key for calculations
 erdr1_calc_key <- list(dapi_express_main = "main dapi / dapi",
@@ -54,7 +55,11 @@ formlst <- list(erdr1=erdr1_calc_key)
 # columns should include: 'Day' (day sample was harvested), 'ID' (the numeric sample ID), 'GT' (sample genotype),
 # 'Sex' (sex of sample), and 'BleoDose' (amount of bleomycin sample received) or 'Virus' (GT of AAV sample received)
 mouseinfo <- read_xlsx(paste0(here::here(), "/mouse_id_info.xlsx"), sheet="ERDR1")
-outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
+# outputs_raw <- list.files(paste0(here::here(), "/out/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
+# outputs_raw <- list.files(paste0(here::here(), "/out_dapi_coloc_false/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
+# outputs_raw <- list.files(paste0(here::here(), "/out_dapi_coloc_true/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
+# Read output saved to one drive instead
+outputs_raw <- list.files(paste0("C:/Users/kd2630/OneDrive - cumc.columbia.edu/Colocalization/out/erdr1/"), pattern="*.csv", recursive = T, full.names = T)
 
 # separate out the additional sections to look at separately
 outputs_all <- outputs_raw[!grepl("out_sep", outputs_raw)] 
@@ -62,13 +67,18 @@ outputs_all <- outputs_raw[!grepl("out_sep", outputs_raw)]
 outputs_all <- outputs_all[grep(toprocess, outputs_all)]
 
 # separate out the additional sections to look at separately
-outputs <- outputs_all[!grepl("addtl_sections", outputs_all)]
+outputs <- outputs_all[!grepl("set_", outputs_all)]
+outputs_sec2 <- outputs_all[grepl("set_2", outputs_all)]
 
-outs_sec1 <- createOuts(datfls=outputs, formnms=formlst, dapithresh=1000)
+
+outs_sec1 <- createOuts(datfls=outputs, formnms=formlst, dapithresh=dapithresh)
 sumOuts_sec1 <- outs_sec1$split_section_output
-slices <- 1  #1:3
 
-sumOuts_list <- list(sumOuts_sec1)
+outs_sec2 <- createOuts(datfls=outputs_sec2, formnms=formlst, dapithresh=dapithresh)
+sumOuts_sec2 <- outs_sec2$split_section_output
+slices <- 1:2  #1:3
+
+sumOuts_list <- list(sumOuts_sec1, sumOuts_sec2)
 
 # Process each section and bind the results
 erdr1_df1 <- map2_dfr(sumOuts_list, slices, ~ processSection(.x, .y, "erdr1", mouseinfo, sex_analyze))
@@ -104,7 +114,7 @@ if (all(erdr1_df1$dapi_colocalize == FALSE)) {
 }
 
 erdr1_plt_out <- processDF(df=erdr1_df1, calc_key=erdr1_calc_key, start_idx=erdr1_start_idx, plotallagg=plot_all_agg,
-                          show_p_correct=correctp, labelsize=20, ptsize=1.5, rm_outliers=F, makemainfig=T,
+                          show_p_correct=correctp, labelsize=20, ptsize=1.5, rm_outliers=F, makemainfig=T, alpha=0.1,
                           col_var="BleoType")
 erdr1_df <- erdr1_plt_out$df
 
@@ -136,7 +146,7 @@ funckeys <- list(erdr1=erdr1_calc_key)
 
 ```
 
-#### Plotting percentages calculated per each 9x4 section with DAPI count > 0; SPC > 10; tdt > 10
+#### Plotting percentages calculated per each 9x4 section with DAPI count > `r dapithresh`; SPC > 10; tdt > 10; colocalizing w/ dapi: `r unique(erdr1_df$dapi_colocalize)`
 
 # erdr1
 ## Analysis of `r ifelse(sex_analyze == "M", yes="Male", no=ifelse(sex_analyze == "F", yes="Female", no="NA"))` mice treated with `r unique(erdr1_df$BleoDose)` U/kg bleomycin
